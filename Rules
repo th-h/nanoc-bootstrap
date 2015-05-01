@@ -1,0 +1,143 @@
+#!/usr/bin/env ruby
+
+# A few helpful tips about the Rules file:
+#
+# * The string given to #compile and #route are matching patterns for
+#   identifiers--not for paths. Therefore, you can’t match on extension.
+#
+# * The order of rules is important: for each item, only the first matching
+#   rule is applied.
+#
+# * Item identifiers start and end with a slash (e.g. “/about/” for the file
+#   “content/about.html”). To select all children, grandchildren, … of an
+#   item, use the pattern “/about/*/”; “/about/*” will also select the parent,
+#   because “*” matches zero or more characters.
+
+#####################
+### preprocessing ###
+#####################
+
+preprocess do
+  # filter items for sitemap
+  items.each do |i|
+    unless i[:extension] == 'md' || i[:extension] == 'haml' || i[:extension] == 'html' || i[:extension] == 'php'
+      i[:is_hidden] = true
+    end
+  end
+end
+
+####################
+### ignore rules ###
+####################
+
+# ignore everything starting with _
+ignore %r{/_}
+
+#########################
+### passthrough rules ###
+#########################
+
+passthrough '/res/js/*/'
+passthrough '/res/css/*/'
+passthrough '/robots/'
+
+#########################
+### compilation rules ###
+#########################
+
+# no layout for htaccess
+compile %r<.*htaccess> do
+  filter :erb
+end
+
+# compile Bootstrap CSS (only) from bootstrap.less
+compile '/bootstrap/less/bootstrap' do
+  filter :less
+end
+compile '/bootstrap/*' do
+  nil
+end
+
+# main rule
+compile '*' do
+  if item.binary?
+    # don’t filter binary items
+    # filter according to extension
+    case item[:extension]
+    when 'haml' then
+      filter :haml
+    when 'md' then
+      filter :erb
+      filter :kramdown
+    when 'html' then
+      filter :erb
+    when 'xml' then
+      filter :erb
+    end
+    # choose layout
+    if item[:extension] == 'xml'
+      nil
+    elsif item[:template].nil? then
+      layout 'default'
+    else
+      layout item[:template]
+    end
+  end
+end
+
+#####################
+### routing rules ###
+#####################
+
+# copy font files and move last -XXX to extension
+route '/res/fonts/*/' do
+  # /fonts/foo-eot/ -> /fonts/foo.eot
+  item.identifier.sub(/-[^-]+\/$/, '') + '.' + item[:extension]
+end
+
+# copy bootstrap files
+route '/bootstrap/less/bootstrap' do
+  item.identifier.sub('/bootstrap/less/','/res/css/').chop + '.css'
+end
+route '/bootstrap/less/*' do
+  nil
+end
+route '/bootstrap/*/' do
+  item.identifier.sub('/bootstrap/','/res/').chop + '.' + item[:extension]
+end
+
+# xml files (sitemap and feeds)
+route "/sitemap/" do
+  item.identifier.chop + '.xml'
+end
+
+# main rule
+route '*' do
+  item_name = if item.identifier=='/'
+                ''
+              else
+                item.identifier.split("/")[-1]
+              end
+  item_path = if File.dirname(item.identifier) == '/'
+                ''
+              else
+                File.dirname(item.identifier)
+              end
+  if item.binary?
+    # Write item with identifier /foo/ to /foo.ext
+    item.identifier.chop + '.' + item[:extension]
+  elsif item_name == 'htaccess'
+    item_path + '/.htaccess'
+  elsif item[:extension] == 'php'
+    item.identifier + 'index.php'
+  else
+    # Write item with identifier /foo/ to /foo/index.html
+    item.identifier + 'index.html'
+  end
+end
+
+####################
+### layout rules ###
+####################
+
+layout '*', :haml
