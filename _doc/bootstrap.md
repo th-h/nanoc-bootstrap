@@ -1,6 +1,6 @@
 # Using Twitter Bootstrap
 
-This site is build from (Twitter) Bootstrap **v3.3.1** (see
+This site is build from (Twitter) Bootstrap **v3.3.4** (see
 [http://getbootstrap.com/](http://getbootstrap.com/)) by *nanoc*.
 
 ## Installing Bootstrap
